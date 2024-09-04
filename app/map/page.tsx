@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "mapbox-gl/dist/mapbox-gl.css";
 import MapGL, {
   NavigationControl,
@@ -11,6 +11,8 @@ import MapGL, {
 } from "react-map-gl";
 import Navbar from "../Navbar";
 
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_API_KEY; // Asegúrate de tener tu token de Mapbox aquí
+
 export default function Map() {
   const [points, setPoints] = useState([
     { longitude: null, latitude: null },
@@ -21,6 +23,7 @@ export default function Map() {
     latitude: number | null;
     text: string;
   } | null>(null);
+  const [route, setRoute] = useState(null); // Estado para almacenar la ruta
 
   const handleMapClick = (event) => {
     const { lng, lat } = event.lngLat;
@@ -39,10 +42,26 @@ export default function Map() {
         { longitude: null, latitude: null },
       ]);
       setPopupInfo(null);
+      setRoute(null); // Reinicia la ruta si seleccionas nuevos puntos
     }
   };
 
-  const lineGeoJSON = {
+  // Obtener la ruta entre los puntos seleccionados
+  useEffect(() => {
+    const getRoute = async () => {
+      if (points[0].longitude && points[1].longitude) {
+        const response = await fetch(
+          `https://api.mapbox.com/directions/v5/mapbox/driving/${points[0].longitude},${points[0].latitude};${points[1].longitude},${points[1].latitude}?geometries=geojson&access_token=${MAPBOX_TOKEN}`
+        );
+        const data = await response.json();
+        setRoute(data.routes[0].geometry); // Guarda la geometría de la ruta
+      }
+    };
+
+    getRoute();
+  }, [points]); // Ejecutar cuando los puntos cambien
+
+  const lineGeoJSON = route || {
     type: "FeatureCollection",
     features: [
       {
@@ -63,7 +82,7 @@ export default function Map() {
 
       <div className="w-full bg-sky-400 flex justify-center items-center h-screen px-8">
         <MapGL
-          mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_API_KEY}
+          mapboxAccessToken={MAPBOX_TOKEN}
           initialViewState={{
             longitude: -66.156798,
             latitude: -17.393801,
@@ -87,18 +106,18 @@ export default function Map() {
           )}
 
           {/* Mostrar la línea entre los puntos si ambos están seleccionados */}
-          {points[0].longitude && points[1].longitude && (
-            <Source id="line" type="geojson" data={lineGeoJSON}>
+          {route && (
+            <Source id="route" type="geojson" data={lineGeoJSON}>
               <Layer
-                id="line"
+                id="route"
                 type="line"
-                source="line"
+                source="route"
                 layout={{
                   "line-cap": "round",
                   "line-join": "round",
                 }}
                 paint={{
-                  "line-color": "#FF5733",
+                  "line-color": "#1014C5",
                   "line-width": 4,
                 }}
               />
